@@ -49,7 +49,7 @@ def extract_text(word_img, model):
     return "HELLO"
 
 def translate_phrase(word, lang):
-    return ""
+    return "HELLO"
 
 def get_word_loc(img, start, end, min_height, max_height):
     left, right, top, bottom = 0, 0, 0, 0
@@ -105,14 +105,15 @@ def cover_text(img, word_locs):
         right = max(right, end)
 
 
+    font_size = ((top-bottom) / 100) * 1.5
     avg_color = np.mean(img[bottom:top, left:right])
     img[bottom:top, left:right] = avg_color
     cv2.imshow('Text Covered', img)
     cv2.waitKey()
-    return img, top, left
+    return img, ((top+bottom) // 2), left, font_size
 
-def write_text(img, text, x,y, font_size = 3):
-    return cv2.putText(img=img, text=text, org=(x, y),fontFace=3, fontScale=3, color=(0,0,0), thickness=5)
+def write_text(img, text, x,y, font_size):
+    return cv2.putText(img=img, text=text, org=(x, y), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=font_size, color=(0,0,0), thickness=10)
     
 
 def translate_text(img_path):
@@ -121,12 +122,12 @@ def translate_text(img_path):
     word_locs = get_word_cords(orig_img, char_cors, calculate_threshold(char_cors))
     pharse = generate_text(orig_img, word_locs)
     translated_text = translate_phrase(pharse, "german")
-    cover_img, bottom, left = cover_text(orig_img, word_locs)
-    final_img = write_text(cover_img, translated_text, left, bottom)
+    cover_img, bottom, left, font_size = cover_text(orig_img, word_locs)
+    final_img = write_text(cover_img, translated_text, left, bottom, font_size)
     cv2.imshow('Translated Image', final_img)
     cv2.waitKey()
 
     
-translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6586.png")
+# translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6586.png")
 # translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6587.png")
-# translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6588.png")
+translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6588.png")
