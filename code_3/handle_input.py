@@ -7,24 +7,58 @@ def process_input_img(img_path):
     orig_img = img.copy()
     cv2.imshow('orig', orig_img)
     cv2.waitKey()
-    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # gray_img = cv2.GaussianBlur(gray_img, (11,11), 5)
-    # gray_img = cv2.medianBlur(gray_img, 5)
-    gray_img = cv2.medianBlur(gray_img, 25)
-    _, thresh1 = cv2.threshold(gray_img, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV | cv2.ADAPTIVE_THRESH_GAUSSIAN_C)
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (18, 18))
-    dilation = cv2.dilate(thresh1, horizontal_kernel, iterations=1)
-    horizontal_contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    return img, orig_img, horizontal_contours
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
-def get_char_cors(horizontal_contours):
+    # Morph open to remove noise
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2,2))
+    opening = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=1)
+
+    # Find contours and remove small noise
+    cnts = cv2.findContours(opening, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+    # for c in cnts:
+    #     area = cv2.contourArea(c)
+    #     if area < 50:
+    #         cv2.drawContours(opening, [c], -1, 0, -1)
+
+    # # Invert and apply slight Gaussian blur
+    # result = 255 - opening
+    # result = cv2.GaussianBlur(result, (3,3), 0)
+
+
+    # cv2.imshow('thresh', thresh)
+    # cv2.waitKey()
+    # cv2.imshow('opening', opening)
+    # cv2.waitKey()
+    # cv2.imshow('result', result)
+    # cv2.waitKey()     
+    # gray_img = cv2.fastNlMeansDenoisingColored(img, None, 10, 10, 7, 21)
+    # img = cv2.medianBlur(img, 25)
+    # gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # # gray_img = cv2.GaussianBlur(gray_img, (11,11), 5)
+    # # gray_img = cv2.medianBlur(gray_img, 5)
+    # gray_img = cv2.medianBlur(gray_img, 25)
+   
+    # _, thresh1 = cv2.threshold(gray_img, 0, 255, cv2.THRESH_OTSU | cv2.THRESH_BINARY_INV | cv2.ADAPTIVE_THRESH_GAUSSIAN_C)
+    # cv2.imshow('blur', thresh1)
+    # cv2.waitKey()
+    # horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (18, 18))
+    # dilation = cv2.dilate(thresh1, horizontal_kernel, iterations=1)
+
+    # horizontal_contours, _ = cv2.findContours(dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    return img, orig_img, cnts
+
+def get_char_cors(img, horizontal_contours):
     cors = []
     for cnt in horizontal_contours:
         x, y, w, h = cv2.boundingRect(cnt)
         # rect = cv2.rectangle(im2, (x, y), (x + w, y + h), (255, 255, 255), 3)
-        if w * h > 1000 and w*h < 1000000:
-            # cv2.rectangle(im2, (x, y), (x + w, y + h), (255, 255, 255), 3)
+        if w * h > 10000 and w*h < 1000000:
+            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 3)
             cors.append((x,y,w,h))
+    cv2.imshow('chars', img)
+    cv2.waitKey()
     cors = sorted(cors)
     return cors
 
@@ -34,7 +68,6 @@ def calculate_threshold(cords):
         x,y,w,h = cords[i]
         x_p, y_p, w_p, h_p = cords[i+1]
         dists.append(abs(x_p - (x + w)))
-
     threshold = 150
     return threshold
 
@@ -46,10 +79,12 @@ def generate_text(img, word_locs):
     return phrase[:-1]
 
 def extract_text(word_img, model):
-    return "HELLO"
+    return "Hello World"
 
-def translate_phrase(word, lang):
-    return "HELLO"
+def translate_phrase(phrase, lang='de'):
+    translated_text = "Hallo mein name ist Waj"
+    translated_text = "Hello"
+    return translated_text
 
 def get_word_loc(img, start, end, min_height, max_height):
     left, right, top, bottom = 0, 0, 0, 0
@@ -118,7 +153,7 @@ def write_text(img, text, x,y, font_size):
 
 def translate_text(img_path):
     img, orig_img, horz_cont = process_input_img(img_path)
-    char_cors = get_char_cors(horz_cont)
+    char_cors = get_char_cors(orig_img, horz_cont)
     word_locs = get_word_cords(orig_img, char_cors, calculate_threshold(char_cors))
     pharse = generate_text(orig_img, word_locs)
     translated_text = translate_phrase(pharse, "german")
@@ -130,4 +165,7 @@ def translate_text(img_path):
     
 # translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6586.png")
 # translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6587.png")
-translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6588.png")
+# translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6588.png")
+# translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6589.png")
+translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6590.png")
+# translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6591.png")

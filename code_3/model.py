@@ -15,6 +15,41 @@ from preprocess import HandleData
 
 char_list = "!\"#&'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
+def create_model():
+    inputs = Input(shape=(32,128,1))
+
+    model = Conv2D(32, (5,5), activation = 'relu', padding='same')(inputs)
+    model = BatchNormalization()(model)
+    model = MaxPool2D(pool_size=(2,2), strides=(2,2), padding='valid')(model)
+
+    model = Conv2D(64, (5,5), activation = 'relu', padding='same')(model)
+    model = BatchNormalization()(model)
+    model = MaxPool2D(pool_size=(2,2), strides=(2,2), padding='valid')(model)
+
+    model = Conv2D(128, (3,3), activation = 'relu', padding='same')(model)
+    model = BatchNormalization()(model)
+    model = MaxPool2D(pool_size=(1,2), strides=(1,2), padding='valid')(model)
+
+    model = Conv2D(128, (3,3), activation = 'relu', padding='same')(model)
+    model = BatchNormalization()(model)
+    model = MaxPool2D(pool_size=(1,2), strides=(1,2), padding='valid')(model)
+
+    model = Conv2D(256, (3,3), activation = 'relu', padding='same')(model)
+    model = BatchNormalization()(model)
+    model = MaxPool2D(pool_size=(1,2), strides=(1,2), padding='valid')(model)
+
+    model = Reshape(target_shape=(32,256))(model)
+    # model = Reshape(target_shape=(8,1024))(model)
+
+    model = Bidirectional(LSTM(256, return_sequences=True, dropout = 0.2))(model)
+    model = Bidirectional(LSTM(256, return_sequences=True, dropout = 0.2))(model)
+
+    outputs = Dense(len(char_list)+1, activation = 'softmax')(model)
+
+    the_model = Model(inputs, outputs)
+    the_model.summary()
+    return the_model,outputs,inputs
+
 def create_model_3():
         # input with shape of height=32 and width=128 
     inputs = Input(shape=(32,128,1))
@@ -94,7 +129,7 @@ def ctc_loss_func(args):
 def gen_model(hD: HandleData):
     train_img, train_label, train_label_len, train_inp_len = hD.process_train()
     val_img, val_label, val_label_len, val_inp_len = hD.process_val()
-    test_model, out, inp = create_model_2()
+    test_model, out, inp = create_model()
     the_labels = Input(shape=[hD.max_len], dtype='float32')
     input_length = Input(shape=[1], dtype='int64')
     label_length = Input(shape=[1], dtype='int64')
@@ -111,7 +146,7 @@ def gen_model(hD: HandleData):
 
     history = model.fit(x=[train_img, train_label, train_inp_len, train_label_len],
                     y=np.zeros(len(train_img)),
-                    batch_size=500, 
+                    batch_size=100, 
                     epochs=20, 
                     validation_data=([val_img, val_label, val_inp_len, val_label_len], [np.zeros(len(val_img))]),
                     verbose=1,
@@ -120,7 +155,8 @@ def gen_model(hD: HandleData):
     model.save(filepath='./model.h5', overwrite=False, include_optimizer=True)
 
 def main():
-    hD = HandleData(img_size=(128,32))
+    # create_model()
+    hD = HandleData(img_size=(32,128))
     print(hD.max_len)
     gen_model(hD)
 

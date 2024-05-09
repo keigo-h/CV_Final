@@ -42,13 +42,18 @@ class HandleData:
                 line = file.readline()
         
         assert len(self.img_paths) == len(self.label_paths)
-        temp = list(zip(self.img_paths, self.label_paths))
-        random.shuffle(temp)
-        self.img_paths, self.label_paths = zip(*temp)
+        # temp = list(zip(self.img_paths, self.label_paths))
+        # random.shuffle(temp)
+        # self.img_paths, self.label_paths = zip(*temp)
+        self.img_paths = self.img_paths[:5265]
+        self.label_paths = self.label_paths[:5265]
         idx = int(len(self.img_paths) * 0.95)
         self.max_len = max_len
         self.train_img = self.img_paths[:idx]
         self.train_label = self.label_paths[:idx]
+        temp = list(zip(self.train_img, self.train_label))
+        random.shuffle(temp)
+        self.train_img, self.train_label = zip(*temp)
         self.val_img = self.img_paths[idx:]
         self.val_label = self.label_paths[idx:]
 
@@ -69,6 +74,7 @@ class HandleData:
         img = cv2.resize(img, (aspect_height, aspect_width))
 
         w, h = img.shape
+        img = img.astype('float32')
 
         if w < 32:
             add_zeros = np.full((32-w, h), 255)
@@ -85,7 +91,8 @@ class HandleData:
             img = cv2.resize(img, dim)
 
         img = np.expand_dims(img, -1)
-        img = img / 255
+        # img = cv2.transpose(img)
+        img = img / 255 - 0.5
 
         return img
     
