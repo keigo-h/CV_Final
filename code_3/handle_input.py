@@ -1,6 +1,12 @@
 import cv2
 import numpy as np
 from scipy.stats import mode
+from model import create_model
+import keras.backend as K
+from googletrans import Translator
+from PIL import Image, ImageDraw, ImageFont
+
+chars = "!\"#&'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
 def process_input_img(img_path):
     img = cv2.imread(img_path)
@@ -54,11 +60,12 @@ def get_char_cors(img, horizontal_contours):
     for cnt in horizontal_contours:
         x, y, w, h = cv2.boundingRect(cnt)
         # rect = cv2.rectangle(im2, (x, y), (x + w, y + h), (255, 255, 255), 3)
-        if w * h > 10000 and w*h < 1000000:
-            cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 255), 3)
+        # if w * h > 10000 and w*h < 100000:
+        if w * h > 500:
+            # cv2.rectangle(img, (x, y), (x + w, y + h), (0, 0, 0), 3)
             cors.append((x,y,w,h))
-    cv2.imshow('chars', img)
-    cv2.waitKey()
+    # cv2.imshow('chars', img)
+    # cv2.waitKey()
     cors = sorted(cors)
     return cors
 
@@ -68,42 +75,95 @@ def calculate_threshold(cords):
         x,y,w,h = cords[i]
         x_p, y_p, w_p, h_p = cords[i+1]
         dists.append(abs(x_p - (x + w)))
-    threshold = 150
+    threshold = 200
     return threshold
 
 def generate_text(img, word_locs):
     phrase = ""
     for left, right, top, bottom in word_locs:
-       text = extract_text(img[bottom:top, left:right], model=None)
+       text = extract_text(img[bottom-10:top+10, left-10:right+10])
        phrase += f'{text} '
     return phrase[:-1]
 
-def extract_text(word_img, model):
-    return "Hello World"
+def extract_text(word_img, trained_model_path="val_loss_cur_best.hdf5"):
+    model,_,_ = create_model()
+    model.load_weights(trained_model_path)
+    word_img = process_img(word_img)
+
+    prediction = model.predict(word_img)
+    
+    # use CTC decoder
+    decoded = K.ctc_decode(prediction, 
+                        input_length=np.ones(prediction.shape[0]) * prediction.shape[1],
+                        greedy=True)[0][0]
+    out = K.get_value(decoded)
+    res = ""
+    for l in out[0]:
+        if l != -1: 
+            res += chars[l]
+    # print(res)
+
+    return res
+
+def process_img(word_img):
+    img = cv2.cvtColor(word_img, cv2.COLOR_BGR2GRAY)
+    
+    w,h = img.shape
+    aspect_width = 32
+    aspect_height = int(h * (aspect_width / w))
+    img = cv2.resize(img, (aspect_height, aspect_width))
+
+    w, h = img.shape
+    img = img.astype('float32')
+
+    if w < 32:
+        add_zeros = np.full((32-w, h), 255)
+        img = np.concatenate((img, add_zeros))
+        w, h = img.shape
+
+    if h < 128:
+        add_zeros = np.full((w, 128-h), 255)
+        img = np.concatenate((img, add_zeros), axis=1)
+        w, h = img.shape
+        
+    if h > 128 or w > 32:
+        dim = (128,32)
+        img = cv2.resize(img, dim)
+
+    img = np.expand_dims(img, -1)
+
+    print(img.shape)
+    # img = cv2.transpose(img)
+    img = img / 255 - 0.5
+    # cv2.imshow('after process', img)
+    # cv2.waitKey()
+    img = np.reshape(img, (1,32,128,1))
+
+    return img
 
 def translate_phrase(phrase, lang='de'):
-    translated_text = "Hallo mein name ist Waj"
-    translated_text = "Hello"
-    return translated_text
+    translator = Translator()   
+    translated_phrase = translator.translate(phrase, src='en', dest=lang)
+    return translated_phrase.text
 
 def get_word_loc(img, start, end, min_height, max_height):
-    left, right, top, bottom = 0, 0, 0, 0
+    left, right, top, bottom = 0,0,0,0
     if start == end:
         left = start[0]
         right = end[0] + end[2]
         bottom = start[1]
         top = start[1] + start[3]
-        cv2.rectangle(img, (start[0], start[1]), (start[0] + start[2], start[1]+ start[3]), (255, 0, 0), 2)
-        cv2.imshow('Words', img)
-        cv2.waitKey()
+        # cv2.rectangle(img, (start[0], start[1]), (start[0] + start[2], start[1]+ start[3]), (255, 0, 0), 2)
+        # cv2.imshow('Words', img)
+        # cv2.waitKey()
     else:
         left = start[0]
         right = end[0] + end[2]
         bottom = min_height
         top = max_height
-        cv2.rectangle(img, (start[0], min_height), (end[0] + end[2], max_height), (255, 0, 0), 2)
-        cv2.imshow('Words', img)
-        cv2.waitKey()
+        # cv2.rectangle(img, (start[0], min_height), (end[0] + end[2], max_height), (255, 0, 0), 2)
+        # cv2.imshow('Words', img)
+        # cv2.waitKey()
     return left, right, top, bottom
 
 def get_word_cords(img, cors, threshold):
@@ -113,6 +173,7 @@ def get_word_cords(img, cors, threshold):
     max_height = cors[0][1] + cors[0][3]
     min_height = cors[0][1]
     word_locs = []
+    print(len(cors))
     while i < len(cors) - 1:
         x,y,w,h = cors[i]
         x_p, y_p, w_p, h_p = cors[i+1]
@@ -128,6 +189,7 @@ def get_word_cords(img, cors, threshold):
             max_height = start[1] + start[3]
             min_height = start[1]
             i += 1
+    
     word_locs.append(get_word_loc(img, start, end, min_height, max_height))
     return word_locs
 
@@ -149,6 +211,17 @@ def cover_text(img, word_locs):
 
 def write_text(img, text, x,y, font_size):
     return cv2.putText(img=img, text=text, org=(x, y), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=font_size, color=(0,0,0), thickness=10)
+
+def print_utf8(cover_img, translated_text, left, bottom, font_size):  
+    # font = ImageFont.load_default()
+    font_path = "/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/Roboto-Bold.ttf"
+    font = ImageFont.truetype(font=font_path, size=100)
+    img_pil = Image.fromarray(cover_img)  
+    draw = ImageDraw.Draw(img_pil)  
+    draw.text((left, bottom), translated_text, font=font,
+           fill=(0, 0, 0, 0)) 
+    image = np.array(img_pil) 
+    return image
     
 
 def translate_text(img_path):
@@ -158,14 +231,63 @@ def translate_text(img_path):
     pharse = generate_text(orig_img, word_locs)
     translated_text = translate_phrase(pharse, "german")
     cover_img, bottom, left, font_size = cover_text(orig_img, word_locs)
-    final_img = write_text(cover_img, translated_text, left, bottom, font_size)
+    final_img = print_utf8(cover_img, translated_text, left, bottom, font_size)
+    # final_img = write_text(cover_img, translated_text, left, bottom, font_size)
     cv2.imshow('Translated Image', final_img)
     cv2.waitKey()
 
+def quick_translate(path):
+   img = cv2.imread(path)
+   extract_text(img) 
     
 # translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6586.png")
 # translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6587.png")
 # translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6588.png")
 # translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6589.png")
-translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6590.png")
+# translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6590.png")
 # translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/IMG_6591.png")
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/words/a02/a02-000/a02-000-01-03.png")
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/words/d03/d03-112/d03-112-01-03.png")
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/hi2.png")
+# translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/hi.png")
+   
+# dataset my
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/words/a01/a01-096u/a01-096u-07-01.png")
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/words/a01/a01-102/a01-102-01-04.png")
+
+# data look alike my
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/data_like_my_2.png")
+
+# data name
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/words/c06/c06-031/c06-031-01-02.png")
+
+# data like name
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/data_like_name_2.png")
+
+# data sentence word
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/test_sent_1.png")
+   
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/words/a04/a04-092/a04-092-07-00.png")
+   
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/bill.png")
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/hi.png")
+
+# The
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/the.png")
+   
+# door
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/door.png")
+
+# is
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/is.png")
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/ls.png")
+
+# open
+# quick_translate("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/open.png")
+
+# the door is open
+translate_text("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/the_door_is_open.png")
+   
+
+
+# print(translate_phrase("hi"))

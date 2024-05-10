@@ -10,7 +10,7 @@ from keras.models import Model
 from keras.activations import relu, sigmoid, softmax
 import keras.backend as K
 from keras.utils import to_categorical
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, CSVLogger
 from preprocess import HandleData
 
 char_list = "!\"#&'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -139,20 +139,26 @@ def gen_model(hD: HandleData):
 
     model.compile(loss={'ctc': lambda y_true, y_pred: y_pred}, optimizer = 'adam', metrics=['accuracy'])
 
-    filepath = "cur_best.hdf5"
+    val_loss_filepath = "val_loss_cur_best.hdf5"
+    train_loss_filepath = "train_loss_cur_best.hdf5"
 
-    checkpoint = ModelCheckpoint(filepath=filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='auto')
-    callbacks_list = [checkpoint]
+    checkpoint1 = ModelCheckpoint(filepath=val_loss_filepath, monitor='val_loss', verbose=1, save_best_only=True, mode='auto')
+    checkpoint2 = ModelCheckpoint(filepath=train_loss_filepath, monitor='loss', verbose=1, save_best_only=True, mode='auto')
+    checkpoint3 = CSVLogger('res.csv', append=True, separator=';')
+    callbacks_list = [checkpoint1, checkpoint2, checkpoint3]
 
     history = model.fit(x=[train_img, train_label, train_inp_len, train_label_len],
                     y=np.zeros(len(train_img)),
-                    batch_size=100, 
-                    epochs=20, 
+                    batch_size=500, 
+                    epochs=100, 
                     validation_data=([val_img, val_label, val_inp_len, val_label_len], [np.zeros(len(val_img))]),
                     verbose=1,
                     callbacks=callbacks_list)
-    # model.save(filepath='./model3.h5', overwrite=False, include_optimizer=True)
-    model.save(filepath='./model.h5', overwrite=False, include_optimizer=True)
+
+    model.save(filepath='./model.h5', overwrite=True, include_optimizer=True)
+
+    with open("output.txt", 'w') as output_file:
+        output_file.write(history.history)
 
 def main():
     # create_model()
@@ -160,4 +166,5 @@ def main():
     print(hD.max_len)
     gen_model(hD)
 
-main()
+if __name__ == "__main__":
+    main()

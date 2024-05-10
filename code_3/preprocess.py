@@ -45,8 +45,8 @@ class HandleData:
         # temp = list(zip(self.img_paths, self.label_paths))
         # random.shuffle(temp)
         # self.img_paths, self.label_paths = zip(*temp)
-        self.img_paths = self.img_paths[:5265]
-        self.label_paths = self.label_paths[:5265]
+        # self.img_paths = self.img_paths[:5265]
+        # self.label_paths = self.label_paths[:5265]
         idx = int(len(self.img_paths) * 0.95)
         self.max_len = max_len
         self.train_img = self.img_paths[:idx]
