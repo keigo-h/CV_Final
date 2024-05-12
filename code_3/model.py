@@ -4,8 +4,7 @@ from keras.models import Model
 import keras.backend
 from keras.callbacks import ModelCheckpoint, CSVLogger
 from preprocess import HandleData
-
-char_list = "!\"#&'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+import params as p
 
 def create_model():
     inputs = Input(shape=(32,128,1))
@@ -35,7 +34,7 @@ def create_model():
     model = Bidirectional(LSTM(256, return_sequences=True, dropout = 0.2))(model)
     model = Bidirectional(LSTM(256, return_sequences=True, dropout = 0.2))(model)
 
-    outputs = Dense(len(char_list)+1, activation = 'softmax')(model)
+    outputs = Dense(len(p.char_list)+1, activation = 'softmax')(model)
 
     the_model = Model(inputs, outputs)
     return the_model,outputs,inputs
@@ -68,8 +67,8 @@ def gen_model(hD: HandleData):
 
     history = model.fit(x=[train_img, train_label, train_inp_len, train_label_len],
                     y=np.zeros(len(train_img)),
-                    batch_size=500, 
-                    epochs=100, 
+                    batch_size=p.batch_size, 
+                    epochs=p.epochs, 
                     validation_data=([val_img, val_label, val_inp_len, val_label_len], [np.zeros(len(val_img))]),
                     verbose=1,
                     callbacks=callbacks_list)
@@ -78,7 +77,7 @@ def gen_model(hD: HandleData):
 
 def main():
     # create_model()
-    hD = HandleData(img_size=(32,128))
+    hD = HandleData(img_size=p.img_size)
     print(hD.max_len)
     gen_model(hD)
 
