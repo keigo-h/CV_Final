@@ -2,12 +2,13 @@ import tensorflow as tf
 import random
 import cv2
 import numpy as np
+import params as p
 
 class HandleData:
     def __init__(self, img_size) -> None:
         self.preprocess()
         self.img_size = img_size
-        self.chars = "!\"#&'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+        self.chars = p.char_lst
 
     def preprocess(self,data_path="../words.txt"):
         chars = set()
@@ -31,7 +32,7 @@ class HandleData:
                 line = file.readline()
         
         assert len(self.img_paths) == len(self.label_paths)
-        idx = int(len(self.img_paths) * 0.95)
+        idx = int(len(self.img_paths) * p.split)
         self.max_len = max_len
         self.train_img = self.img_paths[:idx]
         self.train_label = self.label_paths[:idx]
@@ -52,26 +53,26 @@ class HandleData:
         if img is None:
             img = np.zeros(self.img_size[::-1])
         
-        w,h = img.shape
+        h,w = img.shape
         aspect_width = 32
-        aspect_height = int(h * (aspect_width / w))
+        aspect_height = int(w * (aspect_width / h))
         img = cv2.resize(img, (aspect_height, aspect_width))
 
-        w, h = img.shape
+        h, w = img.shape
         img = img.astype('float32')
 
-        if w < 32:
-            add_zeros = np.full((32-w, h), 255)
+        if h < 32:
+            add_zeros = np.full((32-h, w), 255)
             img = np.concatenate((img, add_zeros))
-            w, h = img.shape
+            h, w = img.shape
     
-        if h < 128:
-            add_zeros = np.full((w, 128-h), 255)
+        if w < 128:
+            add_zeros = np.full((h, 128-w), 255)
             img = np.concatenate((img, add_zeros), axis=1)
-            w, h = img.shape
+            h, w = img.shape
             
-        if h > 128 or w > 32:
-            shape = (128,32)
+        if w > 128 or h > 32:
+            shape = p.cv2_img_size
             img = cv2.resize(img, shape)
 
         img = np.expand_dims(img, -1)
@@ -90,7 +91,7 @@ class HandleData:
             train_imgs.append(self.process_imgs(path))
             train_labels.append(self.encode_label(label))
             train_labels_len.append(len(label))
-            train_input_len.append(32)
+            train_input_len.append(p.input_len)
         return np.asarray(train_imgs), np.asarray(train_labels), np.asarray(train_labels_len), np.asarray(train_input_len)
 
     def process_val(self):
@@ -102,6 +103,6 @@ class HandleData:
             val_imgs.append(self.process_imgs(path))
             val_labels.append(self.encode_label(label))
             val_labels_len.append(len(label))
-            val_input_len.append(32)
+            val_input_len.append(p.input_len)
         return np.asarray(val_imgs), np.asarray(val_labels), np.asarray(val_labels_len), np.asarray(val_input_len)
     
