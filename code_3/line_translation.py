@@ -8,6 +8,13 @@ from PIL import Image, ImageDraw, ImageFont
 from spellchecker import SpellChecker
 import params as p
 from tensorflow.python.framework.errors_impl import NotFoundError
+import tensorflow
+
+"""
+Takes in an input image and translates the text
+"""
+
+IS_VERBOSE = False
 
 def get_lines(img_path, klw, klh):
     img = cv2.imread(img_path)
@@ -17,7 +24,9 @@ def get_lines(img_path, klw, klh):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
 
-    print(np.unique(thresh))
+    if IS_VERBOSE:
+        cv2.imshow('Line Threshold', thresh)
+        cv2.waitKey()
 
     orig_h = orig_img.shape[0]
     orig_w = orig_img.shape[1]
@@ -30,6 +39,10 @@ def get_lines(img_path, klw, klh):
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, struct_shape)
     dilation = cv2.dilate(thresh, kernel, iterations = 1)
 
+    if IS_VERBOSE:
+        cv2.imshow('Line Dilation', dilation)
+        cv2.waitKey()
+
     contours = cv2.findContours(dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     contours = contours[0] if len(contours) == 2 else contours[1]
 
@@ -37,12 +50,18 @@ def get_lines(img_path, klw, klh):
 
     threshold = int((orig_h * orig_w) * 0.035)
 
-    print(threshold)
 
+    if IS_VERBOSE:
+        disp_img = orig_img.copy()
     for cnt in contours:
         x,y,w,h = cv2.boundingRect(cnt)
         if (w*h) > threshold:
             line_locs.append(cv2.boundingRect(cnt))
+            if IS_VERBOSE:
+                cv2.rectangle(disp_img, (x, y), (x + w, y + h), (0, 0, 0), 3)
+    if IS_VERBOSE:
+        cv2.imshow('Line Bound', disp_img)
+        cv2.waitKey()     
     return line_locs, orig_img
 
 def get_line_img(img, img_cors):
@@ -50,6 +69,9 @@ def get_line_img(img, img_cors):
     for x,y,w,h in img_cors:
         copy_img = img.copy()
         imgs.append((copy_img[y:y+h, x:x+w], (x,y,w,h)))
+        if IS_VERBOSE:
+            cv2.imshow('line', copy_img[y:y+h, x:x+w])
+            cv2.waitKey()
     return imgs
 
 def get_word_locs(line_img, kww, kwh):
@@ -58,6 +80,10 @@ def get_word_locs(line_img, kww, kwh):
 
     gray = cv2.cvtColor(line_img, cv2.COLOR_BGR2GRAY)
     thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+
+    if IS_VERBOSE:
+        cv2.imshow('Word Threshold', thresh)
+        cv2.waitKey()
 
     orig_h = orig_img.shape[0]
     orig_w = orig_img.shape[0]
@@ -69,14 +95,26 @@ def get_word_locs(line_img, kww, kwh):
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kw,kh))
     dilation = cv2.dilate(thresh, kernel, iterations = 1)
 
+    if IS_VERBOSE:
+        cv2.imshow('Word Dilation', dilation)
+        cv2.waitKey()
+
     contours = cv2.findContours(dilation, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     contours = contours[0] if len(contours) == 2 else contours[1]
     threshold = int((orig_h * orig_w) * 0.2)
-    print(threshold)
+
+    if IS_VERBOSE:
+        disp_img = orig_img.copy()
+
     for cnt in contours:
         x,y,w,h =cv2.boundingRect(cnt)
         if w*h > threshold:
             word_locs.append((x,y,w,h))
+            if IS_VERBOSE:
+                cv2.rectangle(disp_img, (x, y), (x + w, y + h), (0, 0, 0), 3)
+    if IS_VERBOSE:
+        cv2.imshow('Word Bound', disp_img)
+        cv2.waitKey()
     return line_img, orig_img, word_locs
 
 def get_word_img(line_img, word_cors):
@@ -84,6 +122,9 @@ def get_word_img(line_img, word_cors):
     word_cors = sorted(word_cors)
     for x,y,w,h in word_cors:
         word_imgs.append(line_img[y:y+h, x:x+w])
+        if IS_VERBOSE:
+            cv2.imshow('word', line_img[y:y+h, x:x+w])
+            cv2.waitKey()
     return word_imgs 
 
 def cover_text(orig_img, line_img, line_img_locs):
@@ -151,10 +192,10 @@ def extract_text(word_img, model):
     for l in out[0]:
         if l != -1: 
             res += p.char_lst[l]
-    print(res)
+    print(f'Extracted: {res}')
     spell = SpellChecker()
     cor_res = spell.correction(res)
-    print(cor_res)
+    print(f'Auto-Corrected: {cor_res}')
     if cor_res is None:
         cor_res = res
     return cor_res
@@ -163,6 +204,7 @@ def translate_phrase(phrase, lang='de'):
     translator = Translator()   
     translated_phrase = translator.translate(phrase, src='en', dest=lang)
     print(translated_phrase)
+    print(f'Translated: {translated_phrase.text}')
     return translated_phrase.text
 
 
@@ -178,7 +220,8 @@ def write_text(cover_img, translated_text, left, bottom, font_size= 100):
 def translate_just_word(img, model):
     extract_text(img, model)
 
-def run_translation(file_path=None, file_type=1, model_file_path="trained_models/model.h5"):
+def run_translation(file_path=None, file_type=0, model_file_path="trained_models/model.h5", lang="de", verbose=0):
+    IS_VERBOSE = verbose == 1
     model = get_model(model_file_path)
     if file_type == 0:
         klw, klh = p.line_l_w, p.line_l_h
@@ -196,7 +239,7 @@ def run_translation(file_path=None, file_type=1, model_file_path="trained_models
         line_img, original_img, word_locs = get_word_locs(img, kww, kwh)
         word_imgs = get_word_img(original_img, word_locs)
         phrase = generate_text(word_imgs, model)
-        translated_phrase = translate_phrase(phrase)
+        translated_phrase = translate_phrase(phrase, lang)
         orig_img = cover_text(orig_img, line_img, cors)
         orig_img = write_text(orig_img, translated_phrase, cors[0], cors[1])
         cv2.imshow('translated', orig_img)
@@ -204,9 +247,18 @@ def run_translation(file_path=None, file_type=1, model_file_path="trained_models
 
 # file_path = "/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/the_door_is_open.png"
 # file_path = "/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/multi_line.png"
-# file_path = "/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/bill_multi.png"
+run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/bill_multi.png")
 # file_path = "/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/pineapple3.png"
 # file_path = "/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/is.png"
 # file_path = "/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/data_like_my_2.png"
 # file_path = "/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/data_like_name_2.png"
-# run_translation()
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/soup8.png")
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/pineapple3.png",2)
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/his.png",2)
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/his2.png",2)
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/leadership5.png", 2)
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/it_my.png", 2)
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/MY.png", 2)
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/bob_my.png", 2)
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/data_like_my_2.png", 2)
+# run_translation("/Users/keigoh/Desktop/CS1430_Attempt_3/CV_Final/code_3/test_imgs/disturbance.png", 2)
