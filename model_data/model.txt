@@ -1,0 +1,49 @@
+Model: "model"
+____________________________________________________________________________________
+ Layer (type)                                   Output Shape              Param #   
+====================================================================================
+ input_1 (InputLayer)                           [(None, 32, 128, 1)]      0         
+
+ conv2d (Conv2D)                                (None, 32, 128, 32)       832       
+
+ batch_normalization (BatchNormalization)       (None, 32, 128, 32)      128       
+                                                                       
+ max_pooling2d (MaxPooling2D)                   (None, 16, 64, 32)       0         
+                                                                                   
+ conv2d_1 (Conv2D)                              (None, 16, 64, 64)        51264     
+
+ batch_normalization_1 (BatchNormalization)     (None, 16, 64, 64)       256                                                                           
+
+ max_pooling2d_1 (MaxPooling2D)                 (None, 8, 32, 64)        0                                                                           
+
+ conv2d_2 (Conv2D)                              (None, 8, 32, 128)        73856     
+
+ batch_normalization_2 (BatchNormalization)     (None, 8, 32, 128)       512                                                           
+
+ max_pooling2d_2 (MaxPooling2D)                 (None, 8, 16, 128)       0                                                                    
+
+ conv2d_3 (Conv2D)                              (None, 8, 16, 128)        147584    
+
+ batch_normalization_3 (BatchNormalization)     (None, 8, 16, 128)       512                                                                           
+
+ max_pooling2d_3 (MaxPooling2D)                 (None, 8, 8, 128)        0                                                                                         
+
+ conv2d_4 (Conv2D)                              (None, 8, 8, 256)         295168    
+
+ batch_normalization_4 (BatchNormalization)     (None, 8, 8, 256)        1024                                                                          
+
+ max_pooling2d_4 (MaxPooling2D)                 (None, 8, 4, 256)        0                                                                                         
+
+ reshape (Reshape)                              (None, 32, 256)           0         
+
+ bidirectional (Bidirectional)                  (None, 32, 512)          1050624                                                                 
+                                                                 
+ bidirectional_1 (Bidirectional)                (None, 32, 512)          1574912                                                              
+                                                                 
+ dense (Dense)                                  (None, 32, 79)            40527     
+                                                                 
+=================================================================
+Total params: 3,237,199
+Trainable params: 3,235,983
+Non-trainable params: 1,216
+_________________________________________________________________
